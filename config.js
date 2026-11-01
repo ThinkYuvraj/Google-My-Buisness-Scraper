@@ -6,10 +6,8 @@
 // ==============================================================================
 
 const CONFIG = {
-  // 1. YOUR RAZORPAY PAYMENT LINK (Recommended & Easiest)
-  // Go to: Razorpay Dashboard -> Payment Links -> Create Payment Link for ₹35
-  // Example: "https://rzp.io/l/your_payment_link"
-  RAZORPAY_PAYMENT_LINK: "https://rzp.io/l/your_payment_link",
+  // 1. YOUR RAZORPAY PAYMENT LINK (Live Payment Link)
+  RAZORPAY_PAYMENT_LINK: "https://razorpay.me/@yuvrajsingh4106",
 
   // 2. YOUR RAZORPAY KEY ID (Optional for Standard Checkout)
   // Go to: Razorpay Dashboard -> Settings -> API Keys -> Generate Key
@@ -33,3 +31,4 @@ const CONFIG = {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = CONFIG;
 }
+
