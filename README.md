@@ -13,12 +13,20 @@ An automated Chrome extension to extract leads directly from Google Maps / Googl
   - Direct Google Maps Link
 - **Floating Progress Counter**: Real-time on-page badge showing scraping status with a one-click stop button.
 - **Deduplication**: Automatically filters out duplicate businesses.
+- **Selection & Tick Markers**:
+  - Individual tick checkboxes for each lead row.
+  - "Select All" checkbox in the table header.
+  - Selected count badge and highlighted rows.
+  - **Export Selected CSV**: Export only ticked leads directly to CSV.
+- **Batch Approve & Reject Actions**:
+  - **Approve All / Reject All**: One-click actions in both Dashboard and Popup.
+  - **Approve Selected / Reject Selected**: Apply status in bulk to only ticked rows.
 - **Dedicated Dashboard (`dashboard.html`)**:
-  - Live KPI stats (Total Leads, Leads with Websites, Leads with Phone, Approved, Pending).
+  - Live KPI stats (Total Leads, Leads with Websites, Leads with Phone, Approved, Pending, Rejected).
   - Search & multi-parameter filter (Search query, Status filter, Website presence filter, Phone presence filter).
   - Inline status management (`Approved`, `Pending`, `Rejected`).
   - Batch Email Scanner: Visits extracted websites to find email addresses via `mailto:` links and regex pattern matching.
-  - Export to CSV (filtered or all leads).
+  - Export to CSV (Export Selected, Filtered, or All leads).
   - Clear leads database.
 
 ## 📦 Installation & Setup
@@ -35,4 +43,4 @@ An automated Chrome extension to extract leads directly from Google Maps / Googl
 2. Search for any business niche and location (e.g., *"Dentists in Chicago"* or *"Real estate agents in Austin"*).
 3. Click the extension icon in the toolbar.
 4. Click **Auto-Extract All Leads**.
-5. When finished, click **Check Extracted Websites (Dashboard)** to view, filter, and export your leads to CSV.
+5. When finished, click **Check Extracted Websites (Dashboard)** to view, filter, select with tick markers, and export your leads to CSV.

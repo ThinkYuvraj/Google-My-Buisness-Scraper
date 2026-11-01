@@ -1,32 +1,54 @@
-// dashboard.js - Full-featured dashboard for Google My Business leads
+// dashboard.js - Full-featured dashboard for Google My Business leads with selection and batch controls
 
 let allLeads = [];
 let filteredLeads = [];
+const selectedKeys = new Set();
+
+// Helper to uniquely identify a lead
+function getLeadKey(lead) {
+  return lead.mapsUrl || `${lead.business || lead.name}_${lead.phone || lead.address || ''}`;
+}
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // Elements
+  // Stats Elements
   const statTotal = document.getElementById('stat-total');
   const statWebsites = document.getElementById('stat-websites');
   const statPhones = document.getElementById('stat-phones');
   const statApproved = document.getElementById('stat-approved');
   const statPending = document.getElementById('stat-pending');
+  const statRejected = document.getElementById('stat-rejected');
 
+  // Filter Elements
   const filterSearch = document.getElementById('filter-search');
   const filterStatus = document.getElementById('filter-status');
   const filterWebsite = document.getElementById('filter-website');
   const filterPhone = document.getElementById('filter-phone');
 
+  // Table Elements
   const leadsTableBody = document.getElementById('leads-table-body');
   const emptyState = document.getElementById('empty-state');
+  const thSelectAll = document.getElementById('th-select-all');
 
+  // Selection Bar Elements
+  const selectionBar = document.getElementById('selection-bar');
+  const selectedCountEl = document.getElementById('selected-count');
+  const btnSelectedNumEl = document.getElementById('btn-selected-num');
+  const btnExportSelectedCsv = document.getElementById('btn-export-selected-csv');
+  const btnApproveSelected = document.getElementById('btn-approve-selected');
+  const btnRejectSelected = document.getElementById('btn-reject-selected');
+  const btnDeselectAll = document.getElementById('btn-deselect-all');
+
+  // Header Action Elements
+  const btnApproveAll = document.getElementById('btn-approve-all');
+  const btnRejectAll = document.getElementById('btn-reject-all');
   const btnExportCsv = document.getElementById('btn-export-csv');
   const btnClearAll = document.getElementById('btn-clear-all');
   const btnScrapeEmails = document.getElementById('btn-scrape-emails');
 
-  // 1. Initial Load
+  // 1. Initial Data Load
   await loadLeads();
 
-  // 2. Listen for Storage Changes (Live updates while scraping!)
+  // 2. Storage Sync (Live updates while scraping in background)
   chrome.storage.onChanged.addListener((changes, namespace) => {
     if (namespace === 'local' && changes.leads) {
       allLeads = changes.leads.newValue || [];
@@ -35,23 +57,128 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // 3. Filter Event Listeners
+  // 3. Filter Listeners
   filterSearch.addEventListener('input', applyFilters);
   filterStatus.addEventListener('change', applyFilters);
   filterWebsite.addEventListener('change', applyFilters);
   filterPhone.addEventListener('change', applyFilters);
 
-  // 4. Export CSV
+  // 4. "Select All" Checkbox in Table Header
+  thSelectAll.addEventListener('change', (e) => {
+    const isChecked = e.target.checked;
+    filteredLeads.forEach(lead => {
+      const key = getLeadKey(lead);
+      if (isChecked) {
+        selectedKeys.add(key);
+      } else {
+        selectedKeys.delete(key);
+      }
+    });
+    updateSelectionUI();
+    renderTable(filteredLeads);
+  });
+
+  // 5. Bulk Selection Actions
+  btnDeselectAll.addEventListener('click', () => {
+    selectedKeys.clear();
+    updateSelectionUI();
+    renderTable(filteredLeads);
+  });
+
+  btnApproveSelected.addEventListener('click', async () => {
+    if (selectedKeys.size === 0) return;
+    allLeads.forEach(lead => {
+      if (selectedKeys.has(getLeadKey(lead))) {
+        lead.status = 'Approved';
+      }
+    });
+    await chrome.storage.local.set({ leads: allLeads });
+    renderTable(filteredLeads);
+    updateStats();
+  });
+
+  btnRejectSelected.addEventListener('click', async () => {
+    if (selectedKeys.size === 0) return;
+    allLeads.forEach(lead => {
+      if (selectedKeys.has(getLeadKey(lead))) {
+        lead.status = 'Rejected';
+      }
+    });
+    await chrome.storage.local.set({ leads: allLeads });
+    renderTable(filteredLeads);
+    updateStats();
+  });
+
+  btnExportSelectedCsv.addEventListener('click', () => {
+    const selectedLeads = allLeads.filter(lead => selectedKeys.has(getLeadKey(lead)));
+    if (selectedLeads.length === 0) {
+      alert('No leads selected.');
+      return;
+    }
+    exportToCSV(selectedLeads, `selected_leads_${selectedLeads.length}`);
+  });
+
+  // 6. Global Batch Actions: "Approve All" & "Reject All"
+  btnApproveAll.addEventListener('click', async () => {
+    const targetLeads = filteredLeads.length > 0 ? filteredLeads : allLeads;
+    if (targetLeads.length === 0) {
+      alert('No leads available to approve.');
+      return;
+    }
+
+    if (confirm(`Approve all ${targetLeads.length} visible leads?`)) {
+      const targetKeys = new Set(targetLeads.map(getLeadKey));
+      allLeads.forEach(lead => {
+        if (targetKeys.has(getLeadKey(lead))) {
+          lead.status = 'Approved';
+        }
+      });
+      await chrome.storage.local.set({ leads: allLeads });
+      renderTable(filteredLeads);
+      updateStats();
+    }
+  });
+
+  btnRejectAll.addEventListener('click', async () => {
+    const targetLeads = filteredLeads.length > 0 ? filteredLeads : allLeads;
+    if (targetLeads.length === 0) {
+      alert('No leads available to reject.');
+      return;
+    }
+
+    if (confirm(`Reject all ${targetLeads.length} visible leads?`)) {
+      const targetKeys = new Set(targetLeads.map(getLeadKey));
+      allLeads.forEach(lead => {
+        if (targetKeys.has(getLeadKey(lead))) {
+          lead.status = 'Rejected';
+        }
+      });
+      await chrome.storage.local.set({ leads: allLeads });
+      renderTable(filteredLeads);
+      updateStats();
+    }
+  });
+
+  // 7. Export CSV (Smart export: if items are ticked, prompts or exports selected)
   btnExportCsv.addEventListener('click', () => {
+    if (selectedKeys.size > 0) {
+      const useSelected = confirm(`You have ${selectedKeys.size} leads selected with tick markers.\n\nClick OK to export only SELECTED leads, or Cancel to export ALL filtered leads.`);
+      if (useSelected) {
+        const selectedLeads = allLeads.filter(lead => selectedKeys.has(getLeadKey(lead)));
+        exportToCSV(selectedLeads, `selected_leads_${selectedLeads.length}`);
+        return;
+      }
+    }
+
     const dataToExport = filteredLeads.length > 0 ? filteredLeads : allLeads;
     if (dataToExport.length === 0) {
       alert('No leads to export.');
       return;
     }
-    exportToCSV(dataToExport);
+    exportToCSV(dataToExport, 'leads_export');
   });
 
-  // 5. Clear All Leads
+  // 8. Clear All Leads
   btnClearAll.addEventListener('click', async () => {
     if (allLeads.length === 0) {
       alert('Dashboard is already empty.');
@@ -61,12 +188,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (confirm(`Are you sure you want to delete all ${allLeads.length} leads? This action cannot be undone.`)) {
       await chrome.storage.local.set({ leads: [] });
       allLeads = [];
+      selectedKeys.clear();
       applyFilters();
       updateStats();
+      updateSelectionUI();
     }
   });
 
-  // 6. Extract Emails from Websites (Batch Scanner)
+  // 9. Batch Email Extraction
   btnScrapeEmails.addEventListener('click', async () => {
     const leadsWithWebsites = allLeads.filter(l => (l.website || (l.url && !l.url.includes('google.com/maps'))) && !l.email);
 
@@ -106,10 +235,9 @@ document.addEventListener('DOMContentLoaded', async () => {
           foundCount++;
         }
       } catch (e) {
-        // Website failed or CORS blocked; continue
+        // Failed or CORS blocked
       }
 
-      // Save progress every 5 items
       if (i % 5 === 0 || i === leadsWithWebsites.length - 1) {
         await chrome.storage.local.set({ leads: allLeads });
         applyFilters();
@@ -138,6 +266,38 @@ document.addEventListener('DOMContentLoaded', async () => {
     statPhones.textContent = allLeads.filter(l => Boolean(l.phone)).length;
     statApproved.textContent = allLeads.filter(l => l.status === 'Approved').length;
     statPending.textContent = allLeads.filter(l => (l.status || 'Pending') === 'Pending').length;
+    if (statRejected) {
+      statRejected.textContent = allLeads.filter(l => l.status === 'Rejected').length;
+    }
+  }
+
+  function updateSelectionUI() {
+    const count = selectedKeys.size;
+    if (count > 0) {
+      selectionBar.style.display = 'flex';
+      selectedCountEl.textContent = count;
+      btnSelectedNumEl.textContent = count;
+    } else {
+      selectionBar.style.display = 'none';
+    }
+
+    // Update Header Checkbox state
+    if (filteredLeads.length === 0) {
+      thSelectAll.checked = false;
+      thSelectAll.indeterminate = false;
+    } else {
+      const selectedVisibleCount = filteredLeads.filter(l => selectedKeys.has(getLeadKey(l))).length;
+      if (selectedVisibleCount === filteredLeads.length) {
+        thSelectAll.checked = true;
+        thSelectAll.indeterminate = false;
+      } else if (selectedVisibleCount > 0) {
+        thSelectAll.checked = false;
+        thSelectAll.indeterminate = true;
+      } else {
+        thSelectAll.checked = false;
+        thSelectAll.indeterminate = false;
+      }
+    }
   }
 
   function applyFilters() {
@@ -147,7 +307,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const phoneVal = filterPhone.value;
 
     filteredLeads = allLeads.filter(lead => {
-      // Search matching
+      // Search text match
       const name = (lead.business || lead.name || '').toLowerCase();
       const category = (lead.category || '').toLowerCase();
       const website = (lead.website || lead.url || '').toLowerCase();
@@ -183,6 +343,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     renderTable(filteredLeads);
+    updateSelectionUI();
   }
 
   function renderTable(leads) {
@@ -196,13 +357,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     emptyState.style.display = 'none';
 
     leads.forEach((lead, index) => {
+      const key = getLeadKey(lead);
+      const isSelected = selectedKeys.has(key);
+
       const tr = document.createElement('tr');
+      if (isSelected) {
+        tr.classList.add('selected-row');
+      }
 
       const websiteUrl = lead.website || (lead.url && !lead.url.includes('google.com/maps') ? lead.url : '');
       const displayUrl = websiteUrl ? formatDisplayUrl(websiteUrl) : '';
       const currentStatus = lead.status || 'Pending';
 
       tr.innerHTML = `
+        <td style="text-align: center;">
+          <input type="checkbox" class="custom-check lead-checkbox" data-key="${escapeHtml(key)}" ${isSelected ? 'checked' : ''}>
+        </td>
         <td style="color: #64748b; font-weight: 600;">${index + 1}</td>
         <td>
           <div class="biz-name">
@@ -244,7 +414,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           ` : '<span style="color:#64748b; font-size:12px;">-</span>'}
         </td>
         <td>
-          <select class="status-select status-${currentStatus}" data-index="${index}">
+          <select class="status-select status-${currentStatus}">
             <option value="Approved" ${currentStatus === 'Approved' ? 'selected' : ''}>Approved</option>
             <option value="Pending" ${currentStatus === 'Pending' ? 'selected' : ''}>Pending</option>
             <option value="Rejected" ${currentStatus === 'Rejected' ? 'selected' : ''}>Rejected</option>
@@ -257,14 +427,27 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
               </a>
             ` : ''}
-            <button class="action-icon-btn delete" data-index="${index}" title="Delete Lead">
+            <button class="action-icon-btn delete" title="Delete Lead">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
             </button>
           </div>
         </td>
       `;
 
-      // Status change handler
+      // Tick checkbox event
+      const chk = tr.querySelector('.lead-checkbox');
+      chk.addEventListener('change', (e) => {
+        if (e.target.checked) {
+          selectedKeys.add(key);
+          tr.classList.add('selected-row');
+        } else {
+          selectedKeys.delete(key);
+          tr.classList.remove('selected-row');
+        }
+        updateSelectionUI();
+      });
+
+      // Status change event
       const selectEl = tr.querySelector('.status-select');
       selectEl.addEventListener('change', async (e) => {
         const newStatus = e.target.value;
@@ -274,12 +457,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateStats();
       });
 
-      // Delete handler
+      // Delete event
       const deleteBtn = tr.querySelector('.action-icon-btn.delete');
       deleteBtn.addEventListener('click', async () => {
         const leadIdx = allLeads.indexOf(lead);
         if (leadIdx > -1) {
           allLeads.splice(leadIdx, 1);
+          selectedKeys.delete(key);
           await chrome.storage.local.set({ leads: allLeads });
           applyFilters();
           updateStats();
@@ -300,24 +484,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function findEmailInHtml(html) {
-    // 1. Mailto regex
     const mailtoMatch = html.match(/mailto:([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
     if (mailtoMatch && mailtoMatch[1]) {
       return mailtoMatch[1].toLowerCase();
     }
 
-    // 2. Body regex
     const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b/g;
     const matches = html.match(emailRegex);
     if (matches && matches.length > 0) {
-      // Filter out image extensions or invalid artifacts
       const valid = matches.find(m => !m.match(/\.(png|jpg|jpeg|gif|webp|svg|css|js)$/i));
       if (valid) return valid.toLowerCase();
     }
     return '';
   }
 
-  function exportToCSV(leads) {
+  function exportToCSV(leads, filenamePrefix = 'gmb_leads') {
     const headers = ['Business Name', 'Category', 'Rating', 'Reviews Count', 'Phone', 'Website', 'Address', 'Email', 'Status', 'Extracted At', 'Google Maps URL'];
     const escapeCsv = (str) => `"${(str || '').toString().replace(/"/g, '""')}"`;
 
@@ -340,7 +521,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `gmb_leads_export_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `${filenamePrefix}_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -355,4 +536,3 @@ document.addEventListener('DOMContentLoaded', async () => {
       .replace(/'/g, '&#039;');
   }
 });
-

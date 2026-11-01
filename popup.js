@@ -1,4 +1,4 @@
-// popup.js - Handles Popup UI, Scraping triggers, counters, and redirection to Dashboard
+// popup.js - Handles Popup UI, Scraping triggers, counters, batch approval, and redirection to Dashboard
 
 document.addEventListener('DOMContentLoaded', async () => {
   const statusDot = document.getElementById('status-dot');
@@ -7,12 +7,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const countTotal = document.getElementById('count-total');
   const countWebsites = document.getElementById('count-websites');
-  const countPhones = document.getElementById('count-phones');
   const countApproved = document.getElementById('count-approved');
+  const countRejected = document.getElementById('count-rejected');
 
   const btnStart = document.getElementById('btn-start');
   const btnStop = document.getElementById('btn-stop');
   const btnOpenDashboard = document.getElementById('btn-open-dashboard');
+  const btnPopupApproveAll = document.getElementById('btn-popup-approve-all');
+  const btnPopupRejectAll = document.getElementById('btn-popup-reject-all');
   const btnQuickExport = document.getElementById('btn-quick-export');
   const btnClearLeads = document.getElementById('btn-clear-leads');
   const instructionsBox = document.getElementById('instructions-box');
@@ -80,11 +82,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     setScrapingUIState(true);
 
-    // Try sending message to content script
     try {
       chrome.tabs.sendMessage(currentTab.id, { action: 'start_scraping' }, async (response) => {
         if (chrome.runtime.lastError) {
-          // If script wasn't injected yet, inject it manually
           try {
             await chrome.scripting.executeScript({
               target: { tabId: currentTab.id },
@@ -123,7 +123,39 @@ document.addEventListener('DOMContentLoaded', async () => {
     chrome.tabs.create({ url: dashboardUrl });
   });
 
-  // 6. Quick Export CSV Button
+  // 6. Approve All Leads from Popup
+  if (btnPopupApproveAll) {
+    btnPopupApproveAll.addEventListener('click', async () => {
+      const data = await chrome.storage.local.get({ leads: [] });
+      const leads = data.leads || [];
+      if (leads.length === 0) {
+        alert('No leads to approve.');
+        return;
+      }
+
+      leads.forEach(l => { l.status = 'Approved'; });
+      await chrome.storage.local.set({ leads });
+      await refreshStats();
+    });
+  }
+
+  // 7. Reject All Leads from Popup
+  if (btnPopupRejectAll) {
+    btnPopupRejectAll.addEventListener('click', async () => {
+      const data = await chrome.storage.local.get({ leads: [] });
+      const leads = data.leads || [];
+      if (leads.length === 0) {
+        alert('No leads to reject.');
+        return;
+      }
+
+      leads.forEach(l => { l.status = 'Rejected'; });
+      await chrome.storage.local.set({ leads });
+      await refreshStats();
+    });
+  }
+
+  // 8. Quick Export CSV Button
   btnQuickExport.addEventListener('click', async () => {
     const data = await chrome.storage.local.get({ leads: [] });
     const leads = data.leads || [];
@@ -136,7 +168,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     downloadLeadsCSV(leads);
   });
 
-  // 7. Clear All Leads Button
+  // 9. Clear All Leads Button
   btnClearLeads.addEventListener('click', async () => {
     const data = await chrome.storage.local.get({ leads: [] });
     const count = (data.leads || []).length;
@@ -152,7 +184,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // 8. Listen for Live Progress Messages from Content Script
+  // 10. Listen for Live Progress Messages from Content Script
   chrome.runtime.onMessage.addListener((message) => {
     if (message.action === 'lead_extracted') {
       if (message.totalCount !== undefined) {
@@ -190,8 +222,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       countTotal.textContent = leads.length;
       countWebsites.textContent = leads.filter(l => Boolean(l.website || (l.url && !l.url.includes('google.com/maps')))).length;
-      countPhones.textContent = leads.filter(l => Boolean(l.phone)).length;
       countApproved.textContent = leads.filter(l => l.status === 'Approved').length;
+      if (countRejected) {
+        countRejected.textContent = leads.filter(l => l.status === 'Rejected').length;
+      }
     } catch (err) {
       console.error('Error refreshing stats:', err);
     }
