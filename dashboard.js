@@ -3,7 +3,7 @@
 let allLeads = [];
 let filteredLeads = [];
 const selectedKeys = new Set();
-let currentCredits = 10;
+let currentCredits = typeof CONFIG !== 'undefined' && CONFIG.FREE_TRIAL_LEADS ? CONFIG.FREE_TRIAL_LEADS : 10;
 
 // Helper to uniquely identify a lead
 function getLeadKey(lead) {
@@ -269,12 +269,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Core Functions
   async function loadLeads() {
+    const defaultTrial = typeof CONFIG !== 'undefined' && CONFIG.FREE_TRIAL_LEADS ? CONFIG.FREE_TRIAL_LEADS : 10;
     const data = await chrome.storage.local.get({
       leads: [],
-      credits: 10
+      credits: defaultTrial
     });
     allLeads = data.leads || [];
-    currentCredits = data.credits !== undefined ? data.credits : 10;
+    currentCredits = data.credits !== undefined ? data.credits : defaultTrial;
     applyFilters();
     updateStats();
   }

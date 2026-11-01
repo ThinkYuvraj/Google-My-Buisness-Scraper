@@ -4,7 +4,7 @@ let isScraping = false;
 let shouldStop = false;
 let scrapedCount = 0;
 let floatingBadge = null;
-let currentCredits = 10;
+let currentCredits = typeof CONFIG !== 'undefined' && CONFIG.FREE_TRIAL_LEADS ? CONFIG.FREE_TRIAL_LEADS : 10;
 
 // Listen for messages from popup or background
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -231,8 +231,9 @@ function parseBusinessCard(card) {
 // Main Scraping Loop with Credit Check
 async function startScraping() {
   // 1. Verify credits before starting
-  const creditData = await new Promise(res => chrome.storage.local.get({ credits: 10, leadsUsed: 0 }, res));
-  currentCredits = creditData.credits !== undefined ? creditData.credits : 10;
+  const defaultTrial = typeof CONFIG !== 'undefined' && CONFIG.FREE_TRIAL_LEADS ? CONFIG.FREE_TRIAL_LEADS : 10;
+  const creditData = await new Promise(res => chrome.storage.local.get({ credits: defaultTrial, leadsUsed: 0 }, res));
+  currentCredits = creditData.credits !== undefined ? creditData.credits : defaultTrial;
 
   if (currentCredits <= 0) {
     createFloatingBadge();

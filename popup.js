@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const instructionsBox = document.getElementById('instructions-box');
 
   let currentTab = null;
-  let availableCredits = 10;
+  let availableCredits = typeof CONFIG !== 'undefined' && CONFIG.FREE_TRIAL_LEADS ? CONFIG.FREE_TRIAL_LEADS : 10;
 
   // 1. Initial Data Load & Storage Updates
   await refreshStats();
@@ -252,12 +252,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   async function refreshStats() {
     try {
+      const defaultTrial = typeof CONFIG !== 'undefined' && CONFIG.FREE_TRIAL_LEADS ? CONFIG.FREE_TRIAL_LEADS : 10;
       const data = await chrome.storage.local.get({
         leads: [],
-        credits: 10
+        credits: defaultTrial
       });
       const leads = data.leads || [];
-      availableCredits = data.credits !== undefined ? data.credits : 10;
+      availableCredits = data.credits !== undefined ? data.credits : defaultTrial;
 
       countTotal.textContent = leads.length;
       countWebsites.textContent = leads.filter(l => Boolean(l.website || (l.url && !l.url.includes('google.com/maps')))).length;

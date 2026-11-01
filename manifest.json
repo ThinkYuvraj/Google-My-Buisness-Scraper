@@ -11,6 +11,8 @@
   ],
   "host_permissions": [
     "https://*.google.com/*",
+    "https://*.razorpay.com/*",
+    "https://*.rzp.io/*",
     "http://*/*",
     "https://*/*"
   ],
@@ -25,7 +27,7 @@
         "https://maps.google.com/*",
         "https://*.google.com/maps*"
       ],
-      "js": ["content.js"],
+      "js": ["config.js", "content.js"],
       "run_at": "document_idle"
     }
   ]
