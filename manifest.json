@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "Google Maps & Business Lead Scraper",
+  "version": "2.0",
+  "description": "Automatically extract leads from Google My Business / Google Maps with live count and comprehensive leads dashboard.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://*.google.com/*",
+    "http://*/*",
+    "https://*/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "GMB Lead Scraper"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.google.com/maps/*",
+        "https://maps.google.com/*",
+        "https://*.google.com/maps*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

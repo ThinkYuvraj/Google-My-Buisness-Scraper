@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>GMB Lead Scraper</title>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --success: #16a34a;
+      --success-hover: #15803d;
+      --danger: #dc2626;
+      --danger-hover: #b91c1c;
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: #334155;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      width: 360px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 16px;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 12px;
+    }
+
+    .title-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .icon-logo {
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, #3b82f6, #06b6d4);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 14px;
+      color: white;
+    }
+
+    h2 {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+
+    .badge-version {
+      font-size: 10px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--text-muted);
+    }
+
+    .status-banner {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #94a3b8;
+    }
+
+    .dot.active {
+      background: #22c55e;
+      box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 0.6; }
+      50% { opacity: 1; }
+      100% { opacity: 0.6; }
+    }
+
+    .stats-card {
+      background: linear-gradient(145deg, #1e293b, #0f172a);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      text-align: center;
+      margin-bottom: 14px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+    }
+
+    .stat-number {
+      font-size: 32px;
+      font-weight: 800;
+      color: #38bdf8;
+      line-height: 1.1;
+      margin-bottom: 2px;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+
+    .stat-details {
+      display: flex;
+      justify-content: space-around;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 11px;
+    }
+
+    .stat-detail-item span {
+      display: block;
+      color: var(--text-muted);
+    }
+
+    .stat-detail-item strong {
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+
+    .btn-extract {
+      background: var(--success);
+      color: white;
+    }
+    .btn-extract:hover {
+      background: var(--success-hover);
+    }
+
+    .btn-stop {
+      background: var(--danger);
+      color: white;
+      display: none;
+    }
+    .btn-stop:hover {
+      background: var(--danger-hover);
+    }
+
+    .btn-dashboard {
+      background: linear-gradient(135deg, #2563eb, #3b82f6);
+      color: white;
+      border: 1px solid #60a5fa;
+      font-size: 14px;
+      padding: 12px;
+    }
+    .btn-dashboard:hover {
+      background: linear-gradient(135deg, #1d4ed8, #2563eb);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+    }
+
+    .btn-secondary {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 12px;
+      padding: 8px;
+    }
+    .btn-secondary:hover {
+      background: #334155;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .instructions {
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.4;
+      margin-top: 8px;
+      padding: 8px 10px;
+      background: rgba(30, 41, 59, 0.5);
+      border-radius: 6px;
+    }
+
+    .open-gmaps-link {
+      color: #38bdf8;
+      text-decoration: underline;
+      cursor: pointer;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="title-group">
+      <div class="icon-logo">G</div>
+      <h2>GMB Lead Extractor</h2>
+    </div>
+    <span class="badge-version">v2.0</span>
+  </div>
+
+  <div class="status-banner" id="tab-status-box">
+    <div class="status-indicator">
+      <div class="dot" id="status-dot"></div>
+      <span id="tab-status-text">Checking active tab...</span>
+    </div>
+    <span id="gmaps-shortcut"></span>
+  </div>
+
+  <div class="stats-card">
+    <div class="stat-number" id="count-total">0</div>
+    <div class="stat-label">Total Leads Extracted</div>
+    <div class="stat-details">
+      <div class="stat-detail-item">
+        <span>With Website</span>
+        <strong id="count-websites">0</strong>
+      </div>
+      <div class="stat-detail-item">
+        <span>With Phone</span>
+        <strong id="count-phones">0</strong>
+      </div>
+      <div class="stat-detail-item">
+        <span>Approved</span>
+        <strong id="count-approved">0</strong>
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <!-- Auto Scrape Controls -->
+    <button class="btn-extract" id="btn-start">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+      Auto-Extract All Leads
+    </button>
+    <button class="btn-stop" id="btn-stop">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="6" y="6" width="12" height="12"></rect></svg>
+      Stop Extraction
+    </button>
+
+    <!-- Check Extracted Websites / Open Dashboard -->
+    <button class="btn-dashboard" id="btn-open-dashboard">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+      Check Extracted Websites (Dashboard)
+    </button>
+
+    <div class="btn-row">
+      <button class="btn-secondary" id="btn-quick-export">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        Export CSV
+      </button>
+      <button class="btn-secondary" id="btn-clear-leads" style="color: #f87171;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        Clear Leads
+      </button>
+    </div>
+  </div>
+
+  <div class="instructions" id="instructions-box">
+    <strong>How to use:</strong> Open Google Maps, search for any business niche (e.g. <em>"Dentists in Miami"</em>), then click <strong>Auto-Extract All Leads</strong>.
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
