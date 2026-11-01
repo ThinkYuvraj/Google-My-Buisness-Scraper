@@ -1,10 +1,13 @@
 // popup.js - Handles Popup UI, Scraping triggers, counters, batch approval, credits & Razorpay
 
-document.addEventListener('DOMContentLoaded', async () => {
-  const statusDot = document.getElementById('status-dot');
-  const tabStatusText = document.getElementById('tab-status-text');
-  const gmapsShortcut = document.getElementById('gmaps-shortcut');
+// Run initialization safely whether DOM is already loaded or still loading
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initPopup);
+} else {
+  initPopup();
+}
 
+async function initPopup() {
   const countTotal = document.getElementById('count-total');
   const countWebsites = document.getElementById('count-websites');
   const countApproved = document.getElementById('count-approved');
@@ -34,16 +37,47 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // 2. Check Active Tab Status
+  // 2. Safe Helper to Update Tab Status & Indicators (Null-safe)
+  function setTabStatus(text, isMaps = false, shortcutHtml = '') {
+    const statusTextEl = document.getElementById('tab-status-text');
+    if (statusTextEl) {
+      statusTextEl.textContent = text;
+    }
+
+    const dotEl = document.getElementById('status-dot');
+    if (dotEl) {
+      dotEl.style.background = isMaps ? '#22c55e' : '#f59e0b';
+      if (isMaps) {
+        dotEl.classList.add('active');
+      } else {
+        dotEl.classList.remove('active');
+      }
+    }
+
+    const shortcutEl = document.getElementById('gmaps-shortcut');
+    if (shortcutEl) {
+      shortcutEl.innerHTML = shortcutHtml;
+      const linkOpenMaps = document.getElementById('link-open-maps');
+      if (linkOpenMaps) {
+        linkOpenMaps.onclick = (e) => {
+          e.preventDefault();
+          chrome.tabs.create({ url: 'https://www.google.com/maps' });
+        };
+      }
+    }
+  }
+
+  // 3. Check Active Tab Status
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    currentTab = tab;
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    currentTab = (tabs && tabs.length > 0) ? tabs[0] : null;
 
     if (currentTab && currentTab.url && isGoogleMapsUrl(currentTab.url)) {
-      statusDot.classList.add('active');
-      statusDot.style.background = '#22c55e';
-      tabStatusText.textContent = 'Google Maps detected';
-      gmapsShortcut.innerHTML = '<span style="color:#22c55e; font-weight:600;">● Ready</span>';
+      setTabStatus(
+        'Google Maps detected',
+        true,
+        '<span style="color:#22c55e; font-weight:600;">● Ready</span>'
+      );
 
       chrome.tabs.sendMessage(currentTab.id, { action: 'get_status' }, (response) => {
         if (chrome.runtime.lastError) {
@@ -54,89 +88,88 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       });
     } else {
-      statusDot.classList.remove('active');
-      statusDot.style.background = '#f59e0b';
-      tabStatusText.textContent = 'Not on Google Maps';
-      gmapsShortcut.innerHTML = '<a href="#" id="link-open-maps" style="color:#38bdf8; text-decoration:underline; font-size:11px; font-weight:600;">Open Maps</a>';
-      
-      const linkOpenMaps = document.getElementById('link-open-maps');
-      if (linkOpenMaps) {
-        linkOpenMaps.addEventListener('click', (e) => {
-          e.preventDefault();
-          chrome.tabs.create({ url: 'https://www.google.com/maps' });
-        });
-      }
+      setTabStatus(
+        'Not on Google Maps',
+        false,
+        '<a href="#" id="link-open-maps" style="color:#38bdf8; text-decoration:underline; font-size:11px; font-weight:600;">Open Maps</a>'
+      );
     }
   } catch (err) {
     console.error('Error querying tab:', err);
-    tabStatusText.textContent = 'Ready';
+    setTabStatus('Ready', false);
   }
 
-  // 3. Start Scraping Button (Enforces 10 Free leads / Credit limit)
-  btnStart.addEventListener('click', async () => {
-    if (!currentTab || !isGoogleMapsUrl(currentTab.url)) {
-      const confirmOpen = confirm('Please open Google Maps and search for a category (e.g. "Dentists in Dallas") first.\n\nOpen Google Maps now?');
-      if (confirmOpen) {
-        chrome.tabs.create({ url: 'https://www.google.com/maps' });
-      }
-      return;
-    }
-
-    if (availableCredits <= 0) {
-      const wantPay = confirm(
-        '⚠️ You have 0 credits remaining (10 free leads trial used).\n\n' +
-        'Recharge credits for ₹35 INR to unlock +50 leads?\n\n' +
-        'Click OK to open Razorpay payment page.'
-      );
-      if (wantPay) {
-        chrome.tabs.create({ url: chrome.runtime.getURL('payment.html') });
-      }
-      return;
-    }
-
-    setScrapingUIState(true);
-
-    try {
-      chrome.tabs.sendMessage(currentTab.id, { action: 'start_scraping' }, async (response) => {
-        if (chrome.runtime.lastError) {
-          try {
-            await chrome.scripting.executeScript({
-              target: { tabId: currentTab.id },
-              files: ['content.js']
-            });
-            setTimeout(() => {
-              chrome.tabs.sendMessage(currentTab.id, { action: 'start_scraping' });
-            }, 300);
-          } catch (scriptErr) {
-            console.error('Failed to inject content script:', scriptErr);
-            alert('Could not start scraping. Please refresh the Google Maps tab and try again.');
-            setScrapingUIState(false);
-          }
+  // 4. Start Scraping Button (Enforces 10 Free leads / Credit limit)
+  if (btnStart) {
+    btnStart.addEventListener('click', async () => {
+      if (!currentTab || !isGoogleMapsUrl(currentTab.url)) {
+        const confirmOpen = confirm('Please open Google Maps and search for a category (e.g. "Dentists in Dallas") first.\n\nOpen Google Maps now?');
+        if (confirmOpen) {
+          chrome.tabs.create({ url: 'https://www.google.com/maps' });
         }
-      });
-    } catch (e) {
-      console.error(e);
-      setScrapingUIState(false);
-    }
-  });
+        return;
+      }
 
-  // 4. Stop Scraping Button
-  btnStop.addEventListener('click', () => {
-    if (currentTab && currentTab.id) {
-      chrome.tabs.sendMessage(currentTab.id, { action: 'stop_scraping' }, () => {
+      if (availableCredits <= 0) {
+        const wantPay = confirm(
+          '⚠️ You have 0 credits remaining (10 free leads trial used).\n\n' +
+          'Recharge credits for ₹35 INR to unlock +50 leads?\n\n' +
+          'Click OK to open Razorpay payment page.'
+        );
+        if (wantPay) {
+          chrome.tabs.create({ url: chrome.runtime.getURL('payment.html') });
+        }
+        return;
+      }
+
+      setScrapingUIState(true);
+
+      try {
+        chrome.tabs.sendMessage(currentTab.id, { action: 'start_scraping' }, async (response) => {
+          if (chrome.runtime.lastError) {
+            try {
+              await chrome.scripting.executeScript({
+                target: { tabId: currentTab.id },
+                files: ['config.js', 'content.js']
+              });
+              setTimeout(() => {
+                chrome.tabs.sendMessage(currentTab.id, { action: 'start_scraping' });
+              }, 300);
+            } catch (scriptErr) {
+              console.error('Failed to inject content script:', scriptErr);
+              alert('Could not start scraping. Please refresh the Google Maps tab and try again.');
+              setScrapingUIState(false);
+            }
+          }
+        });
+      } catch (e) {
+        console.error(e);
         setScrapingUIState(false);
-      });
-    } else {
-      setScrapingUIState(false);
-    }
-  });
+      }
+    });
+  }
 
-  // 5. Open Dashboard Button
-  btnOpenDashboard.addEventListener('click', () => {
-    chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html') });
-  });
+  // 5. Stop Scraping Button
+  if (btnStop) {
+    btnStop.addEventListener('click', () => {
+      if (currentTab && currentTab.id) {
+        chrome.tabs.sendMessage(currentTab.id, { action: 'stop_scraping' }, () => {
+          setScrapingUIState(false);
+        });
+      } else {
+        setScrapingUIState(false);
+      }
+    });
+  }
 
-  // 6. Open Recharge / Razorpay Payment
+  // 6. Open Dashboard Button
+  if (btnOpenDashboard) {
+    btnOpenDashboard.addEventListener('click', () => {
+      chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html') });
+    });
+  }
+
+  // 7. Open Recharge / Razorpay Payment
   if (btnOpenRecharge) {
     btnOpenRecharge.addEventListener('click', () => {
       chrome.tabs.create({ url: chrome.runtime.getURL('payment.html') });
@@ -148,7 +181,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // 7. Approve All Leads from Popup
+  // 8. Approve All Leads from Popup
   if (btnPopupApproveAll) {
     btnPopupApproveAll.addEventListener('click', async () => {
       const data = await chrome.storage.local.get({ leads: [] });
@@ -164,7 +197,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // 8. Reject All Leads from Popup
+  // 9. Reject All Leads from Popup
   if (btnPopupRejectAll) {
     btnPopupRejectAll.addEventListener('click', async () => {
       const data = await chrome.storage.local.get({ leads: [] });
@@ -180,39 +213,43 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // 9. Quick Export CSV Button
-  btnQuickExport.addEventListener('click', async () => {
-    const data = await chrome.storage.local.get({ leads: [] });
-    const leads = data.leads || [];
+  // 10. Quick Export CSV Button
+  if (btnQuickExport) {
+    btnQuickExport.addEventListener('click', async () => {
+      const data = await chrome.storage.local.get({ leads: [] });
+      const leads = data.leads || [];
 
-    if (leads.length === 0) {
-      alert('No leads to export! Extract some leads first.');
-      return;
-    }
+      if (leads.length === 0) {
+        alert('No leads to export! Extract some leads first.');
+        return;
+      }
 
-    downloadLeadsCSV(leads);
-  });
+      downloadLeadsCSV(leads);
+    });
+  }
 
-  // 10. Clear All Leads Button
-  btnClearLeads.addEventListener('click', async () => {
-    const data = await chrome.storage.local.get({ leads: [] });
-    const count = (data.leads || []).length;
+  // 11. Clear All Leads Button
+  if (btnClearLeads) {
+    btnClearLeads.addEventListener('click', async () => {
+      const data = await chrome.storage.local.get({ leads: [] });
+      const count = (data.leads || []).length;
 
-    if (count === 0) {
-      alert('There are no leads to clear.');
-      return;
-    }
+      if (count === 0) {
+        alert('There are no leads to clear.');
+        return;
+      }
 
-    if (confirm(`Are you sure you want to permanently delete all ${count} extracted leads?`)) {
-      await chrome.storage.local.set({ leads: [] });
-      await refreshStats();
-    }
-  });
+      if (confirm(`Are you sure you want to permanently delete all ${count} extracted leads?`)) {
+        await chrome.storage.local.set({ leads: [] });
+        await refreshStats();
+      }
+    });
+  }
 
-  // 11. Listen for Live Progress & Payment Open Requests
+  // 12. Listen for Live Progress & Payment Open Requests
   chrome.runtime.onMessage.addListener((message) => {
     if (message.action === 'lead_extracted') {
-      if (message.totalCount !== undefined) {
+      if (message.totalCount !== undefined && countTotal) {
         countTotal.textContent = message.totalCount;
       }
       if (message.creditsRemaining !== undefined) {
@@ -239,14 +276,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function setScrapingUIState(isExtracting) {
-    if (isExtracting) {
-      btnStart.style.display = 'none';
-      btnStop.style.display = 'flex';
-      instructionsBox.innerHTML = '<span style="color:#22c55e; font-weight:600;">⚡ Scraping in progress...</span> Google Maps is auto-scrolling and extracting leads.';
-    } else {
-      btnStart.style.display = 'flex';
-      btnStop.style.display = 'none';
-      instructionsBox.innerHTML = '<strong>How to use:</strong> Open Google Maps, search for any business niche (e.g. <em>"Dentists in Miami"</em>), then click <strong>Auto-Extract All Leads</strong>.';
+    if (btnStart) btnStart.style.display = isExtracting ? 'none' : 'flex';
+    if (btnStop) btnStop.style.display = isExtracting ? 'flex' : 'none';
+    if (instructionsBox) {
+      if (isExtracting) {
+        instructionsBox.innerHTML = '<span style="color:#22c55e; font-weight:600;">⚡ Scraping in progress...</span> Google Maps is auto-scrolling and extracting leads.';
+      } else {
+        instructionsBox.innerHTML = '<strong>How to use:</strong> Open Google Maps, search for any business niche (e.g. <em>"Dentists in Miami"</em>), then click <strong>Auto-Extract All Leads</strong>.';
+      }
     }
   }
 
@@ -260,19 +297,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       const leads = data.leads || [];
       availableCredits = data.credits !== undefined ? data.credits : defaultTrial;
 
-      countTotal.textContent = leads.length;
-      countWebsites.textContent = leads.filter(l => Boolean(l.website || (l.url && !l.url.includes('google.com/maps')))).length;
-      countApproved.textContent = leads.filter(l => l.status === 'Approved').length;
-      if (countRejected) {
-        countRejected.textContent = leads.filter(l => l.status === 'Rejected').length;
-      }
+      if (countTotal) countTotal.textContent = leads.length;
+      if (countWebsites) countWebsites.textContent = leads.filter(l => Boolean(l.website || (l.url && !l.url.includes('google.com/maps')))).length;
+      if (countApproved) countApproved.textContent = leads.filter(l => l.status === 'Approved').length;
+      if (countRejected) countRejected.textContent = leads.filter(l => l.status === 'Rejected').length;
       if (countCredits) {
         countCredits.textContent = availableCredits;
-        if (availableCredits <= 0) {
-          countCredits.style.background = '#ef4444';
-        } else {
-          countCredits.style.background = '#2563eb';
-        }
+        countCredits.style.background = availableCredits <= 0 ? '#ef4444' : '#2563eb';
       }
     } catch (err) {
       console.error('Error refreshing stats:', err);
@@ -305,4 +336,4 @@ document.addEventListener('DOMContentLoaded', async () => {
     a.click();
     URL.revokeObjectURL(url);
   }
-});
+}
