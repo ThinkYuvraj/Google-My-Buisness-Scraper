@@ -107,6 +107,17 @@
       background: var(--primary-hover);
     }
 
+    .btn-recharge {
+      background: linear-gradient(135deg, #072654, #0c2340);
+      border-color: #3395ff;
+      color: #ffffff;
+      box-shadow: 0 2px 8px rgba(51, 149, 255, 0.2);
+    }
+    .btn-recharge:hover {
+      background: linear-gradient(135deg, #0a336f, #113158);
+      box-shadow: 0 4px 12px rgba(51, 149, 255, 0.35);
+    }
+
     .btn-success {
       background: #059669;
       color: white;
@@ -154,7 +165,7 @@
     /* Stats Grid */
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
       gap: 16px;
       margin-bottom: 24px;
     }
@@ -177,6 +188,7 @@
       height: 100%;
       background: var(--primary);
     }
+    .stat-card.credits::before { background: #38bdf8; }
     .stat-card.websites::before { background: #06b6d4; }
     .stat-card.phones::before { background: #10b981; }
     .stat-card.approved::before { background: #22c55e; }
@@ -352,7 +364,6 @@
       vertical-align: middle;
     }
 
-    /* Custom Checkbox */
     .custom-check {
       width: 17px;
       height: 17px;
@@ -477,7 +488,6 @@
       margin-bottom: 6px;
     }
 
-    /* Email badge */
     .email-text {
       color: #a78bfa;
       font-size: 12px;
@@ -497,6 +507,12 @@
       </div>
     </div>
     <div class="header-actions">
+      <!-- Razorpay Recharge Button -->
+      <button class="btn btn-recharge" id="btn-recharge-dashboard" title="Recharge lead extraction credits via Razorpay">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+        Recharge (₹35 Razorpay)
+      </button>
+
       <!-- Quick Batch Actions: Approve All & Reject All -->
       <button class="btn btn-outline-success" id="btn-approve-all" title="Approve all visible leads">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
@@ -524,8 +540,12 @@
 
   <!-- Metric / KPI Cards -->
   <section class="stats-grid">
+    <div class="stat-card credits">
+      <div class="label">Credits Remaining</div>
+      <div class="value" id="stat-credits" style="color: #38bdf8;">10</div>
+    </div>
     <div class="stat-card">
-      <div class="label">Total Leads</div>
+      <div class="label">Total Extracted</div>
       <div class="value" id="stat-total">0</div>
     </div>
     <div class="stat-card websites">
@@ -579,7 +599,7 @@
     </div>
   </section>
 
-  <!-- Dynamic Bulk Selection Bar (Shows when tick markers are checked) -->
+  <!-- Dynamic Bulk Selection Bar -->
   <section class="selection-bar" id="selection-bar">
     <div class="selection-info">
       <span class="selection-count-badge" id="selected-count">0</span>

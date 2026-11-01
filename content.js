@@ -1,9 +1,10 @@
-// Google Maps / Google My Business Lead Scraper Content Script
+// Google Maps / Google My Business Lead Scraper Content Script with Credit & Payment Check
 
 let isScraping = false;
 let shouldStop = false;
 let scrapedCount = 0;
 let floatingBadge = null;
+let currentCredits = 10;
 
 // Listen for messages from popup or background
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -22,12 +23,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({ status: 'stopped' });
     return true;
   } else if (request.action === 'get_status') {
-    sendResponse({ isScraping, scrapedCount });
+    sendResponse({ isScraping, scrapedCount, credits: currentCredits });
     return true;
   }
 });
 
-// Create or update on-screen status badge
+// Create or update on-screen status badge with live credit counter
 function createFloatingBadge() {
   if (document.getElementById('gmb-scraper-badge')) return;
 
@@ -56,9 +57,15 @@ function createFloatingBadge() {
     <div style="width: 10px; height: 10px; border-radius: 50%; background: #22c55e; animation: pulse 1.5s infinite;" id="gmb-badge-dot"></div>
     <div>
       <div style="font-weight: 700; font-size: 13px;" id="gmb-badge-title">GMB Scraper Active</div>
-      <div style="color: #94a3b8; font-size: 11px;" id="gmb-badge-subtitle">Extracted: <strong id="gmb-badge-count" style="color:#38bdf8;">0</strong> leads</div>
+      <div style="color: #94a3b8; font-size: 11px;" id="gmb-badge-subtitle">
+        Extracted: <strong id="gmb-badge-count" style="color:#38bdf8;">0</strong> leads •
+        Credits: <strong id="gmb-badge-credits" style="color:#4ade80;">10</strong> left
+      </div>
     </div>
-    <button id="gmb-badge-stop" style="margin-left: 8px; background: #ef4444; border: none; color: white; padding: 4px 10px; border-radius: 6px; font-size: 11px; cursor: pointer; font-weight: 600;">Stop</button>
+    <div style="display:flex; gap:6px; margin-left: 6px;">
+      <button id="gmb-badge-recharge" style="background: #2563eb; border: none; color: white; padding: 4px 8px; border-radius: 6px; font-size: 11px; cursor: pointer; font-weight: 600;">Recharge ₹35</button>
+      <button id="gmb-badge-stop" style="background: #ef4444; border: none; color: white; padding: 4px 8px; border-radius: 6px; font-size: 11px; cursor: pointer; font-weight: 600;">Stop</button>
+    </div>
   `;
 
   document.body.appendChild(floatingBadge);
@@ -79,32 +86,35 @@ function createFloatingBadge() {
     updateBadge('Extraction Stopped', false);
     chrome.runtime.sendMessage({ action: 'scraping_stopped', count: scrapedCount });
   });
+
+  document.getElementById('gmb-badge-recharge').addEventListener('click', () => {
+    chrome.runtime.sendMessage({ action: 'open_payment' });
+  });
 }
 
 function updateBadge(title, isRunning = true) {
   const titleEl = document.getElementById('gmb-badge-title');
   const countEl = document.getElementById('gmb-badge-count');
+  const creditsEl = document.getElementById('gmb-badge-credits');
   const dotEl = document.getElementById('gmb-badge-dot');
 
   if (titleEl) titleEl.innerText = title;
   if (countEl) countEl.innerText = scrapedCount;
+  if (creditsEl) creditsEl.innerText = currentCredits;
   if (dotEl) {
-    dotEl.style.background = isRunning ? '#22c55e' : '#f59e0b';
+    dotEl.style.background = isRunning ? '#22c55e' : (currentCredits <= 0 ? '#ef4444' : '#f59e0b');
     dotEl.style.animation = isRunning ? 'pulse 1.5s infinite' : 'none';
   }
 }
 
 // Find scrollable container for Google Maps search results
 function getFeedContainer() {
-  // Strategy 1: role="feed"
   let feed = document.querySelector('div[role="feed"]');
   if (feed) return feed;
 
-  // Strategy 2: aria-label containing "Results for"
   feed = document.querySelector('div[aria-label*="Results for" i], div[aria-label*="Resultados" i]');
   if (feed) return feed;
 
-  // Strategy 3: common Google Maps scroll wrapper classes
   const candidates = document.querySelectorAll('div.m6QErb.DxyBCb.kA9KIf.dS8AEf.ecceSd, div.m6QErb[aria-label]');
   for (const c of candidates) {
     if (c.scrollHeight > 500 && c.querySelectorAll('a.hfpxzc, div.Nv2PK').length > 0) {
@@ -112,7 +122,6 @@ function getFeedContainer() {
     }
   }
 
-  // Strategy 4: any parent containing multiple place links
   const placeLink = document.querySelector('a.hfpxzc');
   if (placeLink) {
     let parent = placeLink.parentElement;
@@ -130,17 +139,14 @@ function getFeedContainer() {
 // Extract lead information from a DOM card element
 function parseBusinessCard(card) {
   try {
-    // 1. Business Name
     const linkEl = card.querySelector('a.hfpxzc');
     const nameEl = card.querySelector('.qBF1Pd, .fontHeadlineSmall, [role="heading"]');
     const name = linkEl?.getAttribute('aria-label') || nameEl?.textContent?.trim() || '';
 
     if (!name) return null;
 
-    // 2. Google Maps URL
     const mapsUrl = linkEl?.href || '';
 
-    // 3. Rating & Reviews
     const ratingEl = card.querySelector('.MW4etd, span[aria-label*="stars" i], span[aria-label*="étoiles" i]');
     const rating = ratingEl?.textContent?.trim() || '';
 
@@ -148,14 +154,12 @@ function parseBusinessCard(card) {
     let reviews = reviewsEl?.textContent?.trim() || '';
     reviews = reviews.replace(/[()]/g, '');
 
-    // 4. Website
     let website = '';
     const websiteEl = card.querySelector('a[data-value="Website"], a[aria-label*="Website" i], a[aria-label*="Site web" i], a.lcr4fd');
     if (websiteEl && websiteEl.href && !websiteEl.href.includes('google.com/maps')) {
       website = websiteEl.href;
     }
 
-    // 5. Phone & Category & Address from secondary lines (.W4Efsd)
     let category = '';
     let address = '';
     let phone = '';
@@ -172,7 +176,6 @@ function parseBusinessCard(card) {
       });
     });
 
-    // Extract phone using regex
     const phoneRegex = /(?:\+?\d{1,3}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{3,9}/;
     for (const block of allTextBlocks) {
       if (!phone && phoneRegex.test(block) && block.replace(/\D/g, '').length >= 7) {
@@ -180,7 +183,6 @@ function parseBusinessCard(card) {
       }
     }
 
-    // Category is usually first item of the second row
     if (textLines.length > 0) {
       const firstLineSpans = textLines[0].querySelectorAll('span');
       if (firstLineSpans.length > 0) {
@@ -191,7 +193,6 @@ function parseBusinessCard(card) {
       }
     }
 
-    // Address often contains comma or numbers
     for (const block of allTextBlocks) {
       if (block !== name && block !== category && block !== phone && !block.includes('Open') && !block.includes('Closed') && !block.includes('hours') && block.length > 4) {
         if (!address) {
@@ -200,7 +201,6 @@ function parseBusinessCard(card) {
       }
     }
 
-    // Normalize website URL if Google redirected it
     if (website && website.includes('google.com/url?')) {
       try {
         const urlParams = new URL(website).searchParams;
@@ -228,8 +228,26 @@ function parseBusinessCard(card) {
   }
 }
 
-// Main Scraping Loop
+// Main Scraping Loop with Credit Check
 async function startScraping() {
+  // 1. Verify credits before starting
+  const creditData = await new Promise(res => chrome.storage.local.get({ credits: 10, leadsUsed: 0 }, res));
+  currentCredits = creditData.credits !== undefined ? creditData.credits : 10;
+
+  if (currentCredits <= 0) {
+    createFloatingBadge();
+    updateBadge('Limit Reached (₹35 for more)', false);
+    const wantRecharge = confirm(
+      '⚠️ Free limit reached (10 leads trial used).\n\n' +
+      'To extract more leads, please recharge for ₹35 INR via Razorpay (+50 leads).\n\n' +
+      'Open Razorpay Recharge page now?'
+    );
+    if (wantRecharge) {
+      chrome.runtime.sendMessage({ action: 'open_payment' });
+    }
+    return;
+  }
+
   isScraping = true;
   shouldStop = false;
   createFloatingBadge();
@@ -257,13 +275,20 @@ async function startScraping() {
   let lastScrollTop = -1;
 
   while (isScraping && !shouldStop) {
-    // Collect all card elements in feed
     const cards = feed.querySelectorAll('div.Nv2PK, div[role="article"]');
-
     let newlyAdded = 0;
 
     for (const card of cards) {
       if (shouldStop) break;
+
+      // Check remaining credits
+      if (currentCredits <= 0) {
+        isScraping = false;
+        updateBadge('Limit Reached (₹35 for more)', false);
+        chrome.runtime.sendMessage({ action: 'credits_exhausted' }).catch(() => {});
+        alert('⚠️ Credit limit reached! You have used all available lead credits. Please recharge for ₹35 INR via Razorpay to continue extracting.');
+        break;
+      }
 
       const lead = parseBusinessCard(card);
       if (lead && lead.name) {
@@ -272,22 +297,31 @@ async function startScraping() {
           knownKeys.add(key);
           existingLeads.push(lead);
           newlyAdded++;
+          currentCredits--;
           scrapedCount = existingLeads.length;
 
-          // Notify popup and floating badge
           updateBadge(`Extracting...`, true);
           chrome.runtime.sendMessage({
             action: 'lead_extracted',
             totalCount: scrapedCount,
+            creditsRemaining: currentCredits,
             lead: lead
           }).catch(() => {});
         }
       }
     }
 
-    // Save batch to storage
+    // Save batch to storage and update credits
     if (newlyAdded > 0) {
-      await new Promise(res => chrome.storage.local.set({ leads: existingLeads }, res));
+      await new Promise(res => chrome.storage.local.set({
+        leads: existingLeads,
+        credits: currentCredits,
+        leadsUsed: (creditData.leadsUsed || 0) + newlyAdded
+      }, res));
+    }
+
+    if (currentCredits <= 0) {
+      break;
     }
 
     // Check if reached end of feed
@@ -305,19 +339,15 @@ async function startScraping() {
     const currentScroll = feed.scrollTop;
     feed.scrollTop = feed.scrollHeight;
 
-    // Small delay to allow Google Maps to fetch next items
     await new Promise(r => setTimeout(r, 1500));
 
-    // Detect if scroll position didn't change
     if (feed.scrollTop === currentScroll || feed.scrollTop === lastScrollTop) {
       unchangedScrollCount++;
-      // Try slight upward wiggle to trigger lazy loader
       feed.scrollTop -= 150;
       await new Promise(r => setTimeout(r, 400));
       feed.scrollTop = feed.scrollHeight;
 
       if (unchangedScrollCount >= 4) {
-        // Reached end of scrollable content
         updateBadge(`Done (${scrapedCount} leads)`, false);
         chrome.runtime.sendMessage({ action: 'scraping_finished', count: scrapedCount }).catch(() => {});
         break;
@@ -330,5 +360,9 @@ async function startScraping() {
   }
 
   isScraping = false;
-  updateBadge(`Finished (${scrapedCount} leads)`, false);
+  if (currentCredits <= 0) {
+    updateBadge(`Limit Reached (₹35 for more)`, false);
+  } else {
+    updateBadge(`Finished (${scrapedCount} leads)`, false);
+  }
 }

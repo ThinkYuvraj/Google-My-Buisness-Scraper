@@ -1,4 +1,4 @@
-// popup.js - Handles Popup UI, Scraping triggers, counters, batch approval, and redirection to Dashboard
+// popup.js - Handles Popup UI, Scraping triggers, counters, batch approval, credits & Razorpay
 
 document.addEventListener('DOMContentLoaded', async () => {
   const statusDot = document.getElementById('status-dot');
@@ -9,10 +9,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   const countWebsites = document.getElementById('count-websites');
   const countApproved = document.getElementById('count-approved');
   const countRejected = document.getElementById('count-rejected');
+  const countCredits = document.getElementById('count-credits');
 
   const btnStart = document.getElementById('btn-start');
   const btnStop = document.getElementById('btn-stop');
   const btnOpenDashboard = document.getElementById('btn-open-dashboard');
+  const btnOpenRecharge = document.getElementById('btn-open-recharge');
+  const btnQuickRecharge = document.getElementById('btn-quick-recharge');
   const btnPopupApproveAll = document.getElementById('btn-popup-approve-all');
   const btnPopupRejectAll = document.getElementById('btn-popup-reject-all');
   const btnQuickExport = document.getElementById('btn-quick-export');
@@ -20,12 +23,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   const instructionsBox = document.getElementById('instructions-box');
 
   let currentTab = null;
+  let availableCredits = 10;
 
   // 1. Initial Data Load & Storage Updates
   await refreshStats();
 
   chrome.storage.onChanged.addListener((changes, namespace) => {
-    if (namespace === 'local' && changes.leads) {
+    if (namespace === 'local' && (changes.leads || changes.credits)) {
       refreshStats();
     }
   });
@@ -41,10 +45,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       tabStatusText.textContent = 'Google Maps detected';
       gmapsShortcut.innerHTML = '<span style="color:#22c55e; font-weight:600;">● Ready</span>';
 
-      // Check if already scraping on this tab
       chrome.tabs.sendMessage(currentTab.id, { action: 'get_status' }, (response) => {
         if (chrome.runtime.lastError) {
-          // Content script not loaded yet; will be injected when Start is clicked
           return;
         }
         if (response && response.isScraping) {
@@ -70,12 +72,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     tabStatusText.textContent = 'Ready';
   }
 
-  // 3. Start Scraping Button
+  // 3. Start Scraping Button (Enforces 10 Free leads / Credit limit)
   btnStart.addEventListener('click', async () => {
     if (!currentTab || !isGoogleMapsUrl(currentTab.url)) {
       const confirmOpen = confirm('Please open Google Maps and search for a category (e.g. "Dentists in Dallas") first.\n\nOpen Google Maps now?');
       if (confirmOpen) {
         chrome.tabs.create({ url: 'https://www.google.com/maps' });
+      }
+      return;
+    }
+
+    if (availableCredits <= 0) {
+      const wantPay = confirm(
+        '⚠️ You have 0 credits remaining (10 free leads trial used).\n\n' +
+        'Recharge credits for ₹35 INR to unlock +50 leads?\n\n' +
+        'Click OK to open Razorpay payment page.'
+      );
+      if (wantPay) {
+        chrome.tabs.create({ url: chrome.runtime.getURL('payment.html') });
       }
       return;
     }
@@ -117,13 +131,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // 5. Open Dashboard Button (Redirect to Full Dashboard)
+  // 5. Open Dashboard Button
   btnOpenDashboard.addEventListener('click', () => {
-    const dashboardUrl = chrome.runtime.getURL('dashboard.html');
-    chrome.tabs.create({ url: dashboardUrl });
+    chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html') });
   });
 
-  // 6. Approve All Leads from Popup
+  // 6. Open Recharge / Razorpay Payment
+  if (btnOpenRecharge) {
+    btnOpenRecharge.addEventListener('click', () => {
+      chrome.tabs.create({ url: chrome.runtime.getURL('payment.html') });
+    });
+  }
+  if (btnQuickRecharge) {
+    btnQuickRecharge.addEventListener('click', () => {
+      chrome.tabs.create({ url: chrome.runtime.getURL('payment.html') });
+    });
+  }
+
+  // 7. Approve All Leads from Popup
   if (btnPopupApproveAll) {
     btnPopupApproveAll.addEventListener('click', async () => {
       const data = await chrome.storage.local.get({ leads: [] });
@@ -139,7 +164,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // 7. Reject All Leads from Popup
+  // 8. Reject All Leads from Popup
   if (btnPopupRejectAll) {
     btnPopupRejectAll.addEventListener('click', async () => {
       const data = await chrome.storage.local.get({ leads: [] });
@@ -155,7 +180,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // 8. Quick Export CSV Button
+  // 9. Quick Export CSV Button
   btnQuickExport.addEventListener('click', async () => {
     const data = await chrome.storage.local.get({ leads: [] });
     const leads = data.leads || [];
@@ -168,7 +193,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     downloadLeadsCSV(leads);
   });
 
-  // 9. Clear All Leads Button
+  // 10. Clear All Leads Button
   btnClearLeads.addEventListener('click', async () => {
     const data = await chrome.storage.local.get({ leads: [] });
     const count = (data.leads || []).length;
@@ -184,16 +209,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // 10. Listen for Live Progress Messages from Content Script
+  // 11. Listen for Live Progress & Payment Open Requests
   chrome.runtime.onMessage.addListener((message) => {
     if (message.action === 'lead_extracted') {
       if (message.totalCount !== undefined) {
         countTotal.textContent = message.totalCount;
       }
+      if (message.creditsRemaining !== undefined) {
+        availableCredits = message.creditsRemaining;
+        if (countCredits) countCredits.textContent = availableCredits;
+      }
       refreshStats();
     } else if (message.action === 'scraping_finished' || message.action === 'scraping_stopped') {
       setScrapingUIState(false);
       refreshStats();
+    } else if (message.action === 'credits_exhausted') {
+      setScrapingUIState(false);
+      refreshStats();
+      chrome.tabs.create({ url: chrome.runtime.getURL('payment.html') });
+    } else if (message.action === 'open_payment') {
+      chrome.tabs.create({ url: chrome.runtime.getURL('payment.html') });
     }
   });
 
@@ -217,14 +252,26 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   async function refreshStats() {
     try {
-      const data = await chrome.storage.local.get({ leads: [] });
+      const data = await chrome.storage.local.get({
+        leads: [],
+        credits: 10
+      });
       const leads = data.leads || [];
+      availableCredits = data.credits !== undefined ? data.credits : 10;
 
       countTotal.textContent = leads.length;
       countWebsites.textContent = leads.filter(l => Boolean(l.website || (l.url && !l.url.includes('google.com/maps')))).length;
       countApproved.textContent = leads.filter(l => l.status === 'Approved').length;
       if (countRejected) {
         countRejected.textContent = leads.filter(l => l.status === 'Rejected').length;
+      }
+      if (countCredits) {
+        countCredits.textContent = availableCredits;
+        if (availableCredits <= 0) {
+          countCredits.style.background = '#ef4444';
+        } else {
+          countCredits.style.background = '#2563eb';
+        }
       }
     } catch (err) {
       console.error('Error refreshing stats:', err);
@@ -233,7 +280,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function downloadLeadsCSV(leads) {
     const headers = ['Business Name', 'Category', 'Rating', 'Reviews Count', 'Phone', 'Website', 'Address', 'Status', 'Extracted At', 'Google Maps URL'];
-    
     const escapeCsv = (str) => `"${(str || '').toString().replace(/"/g, '""')}"`;
 
     const rows = leads.map(l => [

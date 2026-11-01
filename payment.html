@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recharge Credits - GMB Lead Scraper</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --razorpay: #0c2340;
+      --razorpay-blue: #072654;
+      --razorpay-accent: #3395ff;
+      --success: #10b981;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: #334155;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 30px 20px;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 680px;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    .badge-free {
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      color: #fbbf24;
+      font-size: 12px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-weight: 600;
+      display: inline-block;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 6px;
+    }
+
+    .header p {
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    /* Credit Status Card */
+    .credit-box {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 22px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .credit-box-title {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .credit-box-val {
+      font-size: 24px;
+      font-weight: 800;
+      color: #38bdf8;
+    }
+
+    /* Pricing Card */
+    .pricing-card {
+      background: linear-gradient(145deg, #1e293b, #0f172a);
+      border: 2px solid #3b82f6;
+      border-radius: 16px;
+      padding: 26px;
+      margin-bottom: 24px;
+      position: relative;
+      box-shadow: 0 10px 30px rgba(37, 99, 235, 0.15);
+    }
+
+    .plan-tag {
+      position: absolute;
+      top: -12px;
+      right: 24px;
+      background: linear-gradient(135deg, #3b82f6, #06b6d4);
+      color: white;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 12px;
+      letter-spacing: 0.5px;
+    }
+
+    .plan-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .price-wrap {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      margin: 14px 0 20px;
+    }
+
+    .currency {
+      font-size: 22px;
+      font-weight: 700;
+      color: #38bdf8;
+    }
+
+    .price {
+      font-size: 44px;
+      font-weight: 800;
+      color: #ffffff;
+      line-height: 1;
+    }
+
+    .price-period {
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .features-list {
+      list-style: none;
+      margin-bottom: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .features-list li {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: #cbd5e1;
+    }
+
+    .features-list li svg {
+      color: #10b981;
+      flex-shrink: 0;
+    }
+
+    /* Razorpay Button */
+    .btn-razorpay {
+      width: 100%;
+      background: #0c2340;
+      background-image: linear-gradient(135deg, #072654 0%, #0c2340 100%);
+      border: 1px solid #3395ff;
+      color: white;
+      padding: 14px 20px;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 15px rgba(51, 149, 255, 0.2);
+    }
+
+    .btn-razorpay:hover {
+      background-image: linear-gradient(135deg, #0a336f 0%, #113158 100%);
+      box-shadow: 0 6px 20px rgba(51, 149, 255, 0.35);
+      transform: translateY(-1px);
+    }
+
+    .rzp-logo {
+      font-weight: 800;
+      color: #3395ff;
+      letter-spacing: -0.5px;
+    }
+
+    /* Verification Box */
+    .verify-box {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 22px;
+      margin-bottom: 24px;
+    }
+
+    .verify-box h3 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .verify-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .verify-input {
+      flex: 1;
+      background: #0f172a;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      outline: none;
+    }
+    .verify-input:focus {
+      border-color: var(--primary);
+    }
+
+    .btn-verify {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .btn-verify:hover {
+      background: var(--primary-hover);
+    }
+
+    .btn-test-pay {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      color: #34d399;
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .btn-test-pay:hover {
+      background: rgba(16, 185, 129, 0.25);
+    }
+
+    /* Settings accordion / config */
+    .config-box {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 22px;
+      margin-bottom: 24px;
+    }
+
+    .config-box h3 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .form-group {
+      margin-bottom: 12px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+      font-weight: 500;
+    }
+
+    .form-input {
+      width: 100%;
+      background: #0f172a;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      outline: none;
+    }
+
+    .btn-save-cfg {
+      background: #334155;
+      color: var(--text);
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-save-cfg:hover {
+      background: #475569;
+    }
+
+    /* Transactions history */
+    .history-box {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 22px;
+    }
+
+    .history-box h3 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+
+    .history-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .history-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      padding: 8px 12px;
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 6px;
+    }
+
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: #38bdf8;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+    .back-btn:hover {
+      text-decoration: underline;
+    }
+
+    .notice {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 8px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <a href="dashboard.html" class="back-btn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      Back to Dashboard
+    </a>
+
+    <header class="header">
+      <div class="badge-free">9 + 1 Free Leads Trial</div>
+      <h1>Recharge Lead Credits</h1>
+      <p>This extension requires credits to extract leads beyond the initial 10 free leads.</p>
+    </header>
+
+    <!-- Current Credits Box -->
+    <div class="credit-box">
+      <div>
+        <div class="credit-box-title">Available Credits Balance</div>
+        <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+          Free leads used: <span id="used-leads-count" style="color:#ffffff; font-weight:600;">0</span>/10
+        </div>
+      </div>
+      <div style="text-align: right;">
+        <div class="credit-box-val" id="credits-balance">10</div>
+        <div style="font-size: 11px; color: var(--text-muted);">Leads Remaining</div>
+      </div>
+    </div>
+
+    <!-- Pricing Card -->
+    <div class="pricing-card">
+      <span class="plan-tag">Standard Pack</span>
+      <h2 class="plan-title">GMB Lead Extractor Pack</h2>
+      <p style="color: var(--text-muted); font-size: 13px;">Full access to Google My Business scraping and CSV exports</p>
+
+      <div class="price-wrap">
+        <span class="currency">₹</span>
+        <span class="price">35</span>
+        <span class="price-period">INR / pack</span>
+      </div>
+
+      <ul class="features-list">
+        <li>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          <strong>+50 Leads</strong> added immediately to your account
+        </li>
+        <li>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          Export all leads to Excel & CSV with 1-click
+        </li>
+        <li>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          Extract Phone, Website, Rating, Reviews & Address
+        </li>
+        <li>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          Batch Website Email Scraper included
+        </li>
+      </ul>
+
+      <!-- Razorpay Payment Button -->
+      <button class="btn-razorpay" id="btn-pay-razorpay">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+        Pay ₹35 with <span class="rzp-logo">Razorpay</span>
+      </button>
+
+      <!-- Instant test mode simulation button for developer testing -->
+      <button class="btn-test-pay" id="btn-simulate-payment" title="Instantly test recharge without deducting actual money">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        Simulate ₹35 Payment (Instant Test Mode)
+      </button>
+
+      <p class="notice">Secured by Razorpay • UPI, Google Pay, PhonePe, Paytm, Cards & NetBanking supported</p>
+    </div>
+
+    <!-- Manual / Reference Verification Box -->
+    <div class="verify-box">
+      <h3>Already Paid via Razorpay?</h3>
+      <p style="font-size: 12px; color: var(--text-muted);">If you paid via Razorpay Payment Link or QR code, enter your Payment ID (e.g. <code>pay_...</code>) or transaction reference to verify and credit your account:</p>
+      <div class="verify-row">
+        <input type="text" id="input-payment-id" class="verify-input" placeholder="e.g. pay_Pxyz123456789">
+        <button class="btn-verify" id="btn-verify-payment">Claim +50 Leads</button>
+      </div>
+    </div>
+
+    <!-- Admin / Developer Configuration for Razorpay -->
+    <div class="config-box">
+      <h3>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        Razorpay Settings
+      </h3>
+      <div class="form-group">
+        <label>Your Razorpay Payment Link (or Page URL)</label>
+        <input type="text" id="cfg-rzp-link" class="form-input" placeholder="https://rzp.io/l/your_payment_link">
+        <span style="font-size: 11px; color: var(--text-muted);">Paste your Razorpay Payment Link (from Razorpay Dashboard > Payment Links). If left empty, a demo hosted payment link is used.</span>
+      </div>
+      <div class="form-group">
+        <label>Razorpay Key ID (Optional)</label>
+        <input type="text" id="cfg-rzp-key" class="form-input" placeholder="rzp_test_YourKeyIdHere">
+      </div>
+      <button class="btn-save-cfg" id="btn-save-config">Save Razorpay Settings</button>
+    </div>
+
+    <!-- Transaction History -->
+    <div class="history-box">
+      <h3>Payment & Credit History</h3>
+      <ul class="history-list" id="history-list">
+        <!-- Rendered via payment.js -->
+      </ul>
+    </div>
+  </div>
+
+  <script src="payment.js"></script>
+</body>
+</html>
+

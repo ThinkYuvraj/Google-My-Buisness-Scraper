@@ -1,6 +1,6 @@
 # Google My Business Lead Scraper & Manager (Chrome Extension)
 
-An automated Chrome extension to extract leads directly from Google Maps / Google My Business search results, track metrics in real time, and manage leads in a full-screen interactive dashboard.
+An automated Chrome extension to extract leads directly from Google Maps / Google My Business search results, track metrics in real time, manage leads in a full-screen interactive dashboard, and handle paid recharges via **Razorpay**.
 
 ## 🚀 Features
 
@@ -11,7 +11,12 @@ An automated Chrome extension to extract leads directly from Google Maps / Googl
   - Phone Number
   - Physical Address
   - Direct Google Maps Link
-- **Floating Progress Counter**: Real-time on-page badge showing scraping status with a one-click stop button.
+- **Credits & Monetization System**:
+  - **9 + 1 Free Leads Trial**: Every user starts with 10 free leads.
+  - **₹35 INR Recharge**: After the 10 free leads, users recharge via **Razorpay** for ₹35 INR to unlock +50 leads.
+  - Automatic credit enforcement: pauses scraping when credits hit 0 and notifies user.
+  - Dedicated Payment Portal (`payment.html`) with Razorpay checkout, instant UPI, payment ID verification, and test mode simulation.
+- **Floating Progress Counter**: Real-time on-page badge showing scraping status, remaining credits, and a quick recharge button.
 - **Deduplication**: Automatically filters out duplicate businesses.
 - **Selection & Tick Markers**:
   - Individual tick checkboxes for each lead row.
@@ -22,12 +27,21 @@ An automated Chrome extension to extract leads directly from Google Maps / Googl
   - **Approve All / Reject All**: One-click actions in both Dashboard and Popup.
   - **Approve Selected / Reject Selected**: Apply status in bulk to only ticked rows.
 - **Dedicated Dashboard (`dashboard.html`)**:
-  - Live KPI stats (Total Leads, Leads with Websites, Leads with Phone, Approved, Pending, Rejected).
+  - Live KPI stats (Credits Remaining, Total Leads, Leads with Websites, Leads with Phone, Approved, Pending, Rejected).
   - Search & multi-parameter filter (Search query, Status filter, Website presence filter, Phone presence filter).
   - Inline status management (`Approved`, `Pending`, `Rejected`).
   - Batch Email Scanner: Visits extracted websites to find email addresses via `mailto:` links and regex pattern matching.
   - Export to CSV (Export Selected, Filtered, or All leads).
   - Clear leads database.
+
+## 💳 Razorpay Setup & Payment Flow
+
+1. **Free Tier**: Users can extract up to 10 leads (9 + 1 free) without paying.
+2. **Recharge Flow**:
+   - Click **Recharge (₹35 Razorpay)** in the popup, dashboard, or on-screen scraper badge.
+   - You can configure your own **Razorpay Payment Link** in the settings section of `payment.html`.
+   - Users can pay via UPI (Google Pay, PhonePe, Paytm), Cards, or NetBanking.
+   - Enter the Razorpay Payment ID to verify, or use the **Instant Test Mode Simulation** button for rapid testing.
 
 ## 📦 Installation & Setup
 

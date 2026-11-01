@@ -1,8 +1,9 @@
-// dashboard.js - Full-featured dashboard for Google My Business leads with selection and batch controls
+// dashboard.js - Full-featured dashboard for Google My Business leads with selection, batch controls & credits
 
 let allLeads = [];
 let filteredLeads = [];
 const selectedKeys = new Set();
+let currentCredits = 10;
 
 // Helper to uniquely identify a lead
 function getLeadKey(lead) {
@@ -11,6 +12,7 @@ function getLeadKey(lead) {
 
 document.addEventListener('DOMContentLoaded', async () => {
   // Stats Elements
+  const statCredits = document.getElementById('stat-credits');
   const statTotal = document.getElementById('stat-total');
   const statWebsites = document.getElementById('stat-websites');
   const statPhones = document.getElementById('stat-phones');
@@ -39,6 +41,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnDeselectAll = document.getElementById('btn-deselect-all');
 
   // Header Action Elements
+  const btnRechargeDashboard = document.getElementById('btn-recharge-dashboard');
   const btnApproveAll = document.getElementById('btn-approve-all');
   const btnRejectAll = document.getElementById('btn-reject-all');
   const btnExportCsv = document.getElementById('btn-export-csv');
@@ -50,20 +53,32 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 2. Storage Sync (Live updates while scraping in background)
   chrome.storage.onChanged.addListener((changes, namespace) => {
-    if (namespace === 'local' && changes.leads) {
-      allLeads = changes.leads.newValue || [];
-      applyFilters();
+    if (namespace === 'local') {
+      if (changes.leads) {
+        allLeads = changes.leads.newValue || [];
+        applyFilters();
+      }
+      if (changes.credits) {
+        currentCredits = changes.credits.newValue !== undefined ? changes.credits.newValue : 10;
+      }
       updateStats();
     }
   });
 
-  // 3. Filter Listeners
+  // 3. Recharge Button (Opens Razorpay Payment Page)
+  if (btnRechargeDashboard) {
+    btnRechargeDashboard.addEventListener('click', () => {
+      chrome.tabs.create({ url: chrome.runtime.getURL('payment.html') });
+    });
+  }
+
+  // 4. Filter Listeners
   filterSearch.addEventListener('input', applyFilters);
   filterStatus.addEventListener('change', applyFilters);
   filterWebsite.addEventListener('change', applyFilters);
   filterPhone.addEventListener('change', applyFilters);
 
-  // 4. "Select All" Checkbox in Table Header
+  // 5. "Select All" Checkbox in Table Header
   thSelectAll.addEventListener('change', (e) => {
     const isChecked = e.target.checked;
     filteredLeads.forEach(lead => {
@@ -78,7 +93,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderTable(filteredLeads);
   });
 
-  // 5. Bulk Selection Actions
+  // 6. Bulk Selection Actions
   btnDeselectAll.addEventListener('click', () => {
     selectedKeys.clear();
     updateSelectionUI();
@@ -118,7 +133,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     exportToCSV(selectedLeads, `selected_leads_${selectedLeads.length}`);
   });
 
-  // 6. Global Batch Actions: "Approve All" & "Reject All"
+  // 7. Global Batch Actions: "Approve All" & "Reject All"
   btnApproveAll.addEventListener('click', async () => {
     const targetLeads = filteredLeads.length > 0 ? filteredLeads : allLeads;
     if (targetLeads.length === 0) {
@@ -159,7 +174,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // 7. Export CSV (Smart export: if items are ticked, prompts or exports selected)
+  // 8. Export CSV
   btnExportCsv.addEventListener('click', () => {
     if (selectedKeys.size > 0) {
       const useSelected = confirm(`You have ${selectedKeys.size} leads selected with tick markers.\n\nClick OK to export only SELECTED leads, or Cancel to export ALL filtered leads.`);
@@ -178,7 +193,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     exportToCSV(dataToExport, 'leads_export');
   });
 
-  // 8. Clear All Leads
+  // 9. Clear All Leads
   btnClearAll.addEventListener('click', async () => {
     if (allLeads.length === 0) {
       alert('Dashboard is already empty.');
@@ -195,7 +210,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // 9. Batch Email Extraction
+  // 10. Batch Email Extraction
   btnScrapeEmails.addEventListener('click', async () => {
     const leadsWithWebsites = allLeads.filter(l => (l.website || (l.url && !l.url.includes('google.com/maps'))) && !l.email);
 
@@ -254,13 +269,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Core Functions
   async function loadLeads() {
-    const data = await chrome.storage.local.get({ leads: [] });
+    const data = await chrome.storage.local.get({
+      leads: [],
+      credits: 10
+    });
     allLeads = data.leads || [];
+    currentCredits = data.credits !== undefined ? data.credits : 10;
     applyFilters();
     updateStats();
   }
 
   function updateStats() {
+    if (statCredits) {
+      statCredits.textContent = currentCredits;
+      statCredits.style.color = currentCredits <= 0 ? '#ef4444' : '#38bdf8';
+    }
     statTotal.textContent = allLeads.length;
     statWebsites.textContent = allLeads.filter(l => Boolean(l.website || (l.url && !l.url.includes('google.com/maps')))).length;
     statPhones.textContent = allLeads.filter(l => Boolean(l.phone)).length;
@@ -281,7 +304,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       selectionBar.style.display = 'none';
     }
 
-    // Update Header Checkbox state
     if (filteredLeads.length === 0) {
       thSelectAll.checked = false;
       thSelectAll.indeterminate = false;
@@ -307,7 +329,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const phoneVal = filterPhone.value;
 
     filteredLeads = allLeads.filter(lead => {
-      // Search text match
       const name = (lead.business || lead.name || '').toLowerCase();
       const category = (lead.category || '').toLowerCase();
       const website = (lead.website || lead.url || '').toLowerCase();
@@ -323,17 +344,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         address.includes(query) ||
         email.includes(query);
 
-      // Status filter
       const leadStatus = lead.status || 'Pending';
       const matchesStatus = (statusVal === 'All') || (leadStatus === statusVal);
 
-      // Website filter
       const hasWeb = Boolean(lead.website || (lead.url && !lead.url.includes('google.com/maps')));
       let matchesWebsite = true;
       if (websiteVal === 'HasWebsite') matchesWebsite = hasWeb;
       if (websiteVal === 'NoWebsite') matchesWebsite = !hasWeb;
 
-      // Phone filter
       const hasPhone = Boolean(lead.phone);
       let matchesPhone = true;
       if (phoneVal === 'HasPhone') matchesPhone = hasPhone;
@@ -434,7 +452,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         </td>
       `;
 
-      // Tick checkbox event
       const chk = tr.querySelector('.lead-checkbox');
       chk.addEventListener('change', (e) => {
         if (e.target.checked) {
@@ -447,7 +464,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateSelectionUI();
       });
 
-      // Status change event
       const selectEl = tr.querySelector('.status-select');
       selectEl.addEventListener('change', async (e) => {
         const newStatus = e.target.value;
@@ -457,7 +473,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateStats();
       });
 
-      // Delete event
       const deleteBtn = tr.querySelector('.action-icon-btn.delete');
       deleteBtn.addEventListener('click', async () => {
         const leadIdx = allLeads.indexOf(lead);
